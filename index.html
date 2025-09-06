@@ -765,6 +765,11 @@
 
     <div class="card">
       <h2 class="section-title"><i class="fas fa-box-open"></i> 文件发布</h2>
+      <!-- 新增搜索框 -->
+      <div style="margin-bottom: 24px; display: flex; gap: 12px; align-items: center;">
+        <input type="text" id="fileSearchInput" class="form-input" style="max-width: 350px;" placeholder="搜索文件名/版本..." oninput="filterReleases()">
+        <button class="submit-button" onclick="clearFileSearch()" type="button"><i class="fas fa-times"></i> 清空</button>
+      </div>
       <div class="release-grid" id="releases">
         <div class="loading-text"><i class="fas fa-spinner"></i> 加载发布文件中...</div>
       </div>
@@ -875,65 +880,110 @@
     }
 
     // 完整文件发布功能
+    let allReleasesCache = []; // 缓存所有release数据
+
     async function fetchReleases() {
       try {
         const response = await fetch('https://api.github.com/repos/halei0v0/halei-s-warehouse/releases');
         if (!response.ok) throw new Error('获取发布信息失败');
         
         const releases = await response.json();
-        const container = document.getElementById('releases');
-        
-        container.innerHTML = releases.map(release => `
-          <div class="release">
-            <div class="release-header">
-              <h3><i class="fas fa-tag"></i> ${escapeHtml(release.name)}</h3>
-              <div class="release-meta">
-                <span><i class="fas fa-code-branch"></i> 版本：${escapeHtml(release.tag_name)}</span>
-                <span><i class="fas fa-calendar-alt"></i> 发布时间：${new Date(release.published_at).toLocaleDateString()}</span>
-              </div>
-            </div>
-            <ul class="assets" style="display:none;">
-              ${release.assets.map(asset => `
-                <li class="download-item">
-                  <div class="file-info">
-                    <span class="file-name"><i class="fas fa-file"></i> ${escapeHtml(asset.name)}</span>
-                    <span class="file-size"><i class="fas fa-database"></i> ${formatFileSize(asset.size)}</span>
-                  </div>
-                  <div class="download-options">
-                    <a href="${asset.browser_download_url}" class="download-link">
-                      <i class="fas fa-download"></i> 普通下载
-                    </a>
-                    <a href="${generateProxyUrl(asset.browser_download_url)}" 
-                       class="download-link accelerated">
-                      <i class="fas fa-bolt"></i> 高速下载
-                    </a>
-                  </div>
-                </li>
-              `).join('')}
-            </ul>
-            <button class="submit-button toggle-assets">
-              <i class="fas fa-layer-group"></i> 显示资源
-            </button>
-          </div>
-        `).join('');
+        allReleasesCache = releases; // 缓存
+        renderReleases(releases);
 
         // 更新统计信息
         document.getElementById('release-count').textContent = releases.length;
         const totalFiles = releases.reduce((acc, release) => acc + release.assets.length, 0);
         document.getElementById('file-count').textContent = totalFiles;
-
-        document.querySelectorAll('.toggle-assets').forEach(button => {
-          button.addEventListener('click', function() {
-            const assetsList = this.previousElementSibling;
-            assetsList.style.display = assetsList.style.display === 'none' ? 'block' : 'none';
-            this.innerHTML = assetsList.style.display === 'none' ? 
-              '<i class="fas fa-layer-group"></i> 显示资源' : 
-              '<i class="fas fa-layer-group"></i> 隐藏资源';
-          });
-        });
       } catch (error) {
         showErrorNotification(`文件加载失败: ${error.message}`);
       }
+    }
+
+    function renderReleases(releases) {
+      const container = document.getElementById('releases');
+      if (!releases.length) {
+        container.innerHTML = '<div class="loading-text"><i class="fas fa-info-circle"></i> 没有匹配的文件</div>';
+        return;
+      }
+      container.innerHTML = releases.map(release => `
+        <div class="release">
+          <div class="release-header">
+            <h3><i class="fas fa-tag"></i> ${escapeHtml(release.name)}</h3>
+            <div class="release-meta">
+              <span><i class="fas fa-code-branch"></i> 版本：${escapeHtml(release.tag_name)}</span>
+              <span><i class="fas fa-calendar-alt"></i> 发布时间：${new Date(release.published_at).toLocaleDateString()}</span>
+            </div>
+          </div>
+          <ul class="assets" style="display:none;">
+            ${release.assets.map(asset => `
+              <li class="download-item">
+                <div class="file-info">
+                  <span class="file-name"><i class="fas fa-file"></i> ${escapeHtml(asset.name)}</span>
+                  <span class="file-size"><i class="fas fa-database"></i> ${formatFileSize(asset.size)}</span>
+                </div>
+                <div class="download-options">
+                  <a href="${asset.browser_download_url}" class="download-link">
+                    <i class="fas fa-download"></i> 普通下载
+                  </a>
+                  <a href="${generateProxyUrl(asset.browser_download_url)}" 
+                     class="download-link accelerated">
+                    <i class="fas fa-bolt"></i> 高速下载
+                  </a>
+                </div>
+              </li>
+            `).join('')}
+          </ul>
+          <button class="submit-button toggle-assets">
+            <i class="fas fa-layer-group"></i> 显示资源
+          </button>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.toggle-assets').forEach(button => {
+        button.addEventListener('click', function() {
+          const assetsList = this.previousElementSibling;
+          assetsList.style.display = assetsList.style.display === 'none' ? 'block' : 'none';
+          this.innerHTML = assetsList.style.display === 'none' ? 
+            '<i class="fas fa-layer-group"></i> 显示资源' : 
+            '<i class="fas fa-layer-group"></i> 隐藏资源';
+        });
+      });
+    }
+
+    // 文件搜索功能
+    function filterReleases() {
+      const keyword = document.getElementById('fileSearchInput').value.trim().toLowerCase();
+      if (!keyword) {
+        renderReleases(allReleasesCache);
+        return;
+      }
+      const filtered = allReleasesCache
+        .map(release => {
+          // 过滤assets
+          const filteredAssets = release.assets.filter(asset =>
+            asset.name.toLowerCase().includes(keyword)
+          );
+          // 版本名或release名匹配也显示
+          if (
+            release.name.toLowerCase().includes(keyword) ||
+            release.tag_name.toLowerCase().includes(keyword)
+          ) {
+            return release;
+          }
+          // 只显示有匹配文件的release
+          if (filteredAssets.length) {
+            return { ...release, assets: filteredAssets };
+          }
+          return null;
+        })
+        .filter(Boolean);
+      renderReleases(filtered);
+    }
+
+    function clearFileSearch() {
+      document.getElementById('fileSearchInput').value = '';
+      renderReleases(allReleasesCache);
     }
 
     // 获取并显示讨论区
@@ -1130,6 +1180,7 @@
       closeBtn.style.color = '#2e7d32';
       closeBtn.style.fontSize = '1.2rem';
     }
+    
 
     // 初始化
     document.addEventListener('DOMContentLoaded', initialize);

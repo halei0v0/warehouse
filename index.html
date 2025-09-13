@@ -1113,6 +1113,17 @@
               <span><i class="fas fa-calendar-alt"></i> ${langData[currentLang].published}：${new Date(release.published_at).toLocaleDateString()}</span>
             </div>
           </div>
+          <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px;">
+            <button class="submit-button toggle-desc" style="margin-top:0;">
+              <i class="fas fa-info-circle"></i> ${currentLang === 'zh' ? '显示简介' : 'Show Description'}
+            </button>
+            <button class="submit-button toggle-assets" style="margin-top:0;">
+              <i class="fas fa-layer-group"></i> ${langData[currentLang].showAssets}
+            </button>
+          </div>
+          <div class="release-description" style="margin:0 0 12px 0; color:var(--on-surface-variant); font-size:1rem; display:none;">
+            ${release.body ? release.body.replace(/\n/g, '<br>') : `<span style="color:#bbb;">${langData[currentLang].noContent}</span>`}
+          </div>
           <ul class="assets" style="display:none;">
             ${release.assets.map(asset => `
               <li class="download-item">
@@ -1132,15 +1143,25 @@
               </li>
             `).join('')}
           </ul>
-          <button class="submit-button toggle-assets">
-            <i class="fas fa-layer-group"></i> ${langData[currentLang].showAssets}
-          </button>
         </div>
       `).join('');
 
+      // 简介收起/展开
+      document.querySelectorAll('.toggle-desc').forEach(button => {
+        button.addEventListener('click', function() {
+          const desc = this.parentElement.nextElementSibling;
+          const isShow = desc.style.display === 'block';
+          desc.style.display = isShow ? 'none' : 'block';
+          this.innerHTML = isShow
+            ? `<i class="fas fa-info-circle"></i> ${currentLang === 'zh' ? '显示简介' : 'Show Description'}`
+            : `<i class="fas fa-info-circle"></i> ${currentLang === 'zh' ? '收起简介' : 'Hide Description'}`;
+        });
+      });
+
+      // 资源收起/展开
       document.querySelectorAll('.toggle-assets').forEach(button => {
         button.addEventListener('click', function() {
-          const assetsList = this.previousElementSibling;
+          const assetsList = this.parentElement.parentElement.querySelector('.assets');
           assetsList.style.display = assetsList.style.display === 'none' ? 'block' : 'none';
           this.innerHTML = assetsList.style.display === 'none' ? 
             `<i class="fas fa-layer-group"></i> ${langData[currentLang].showAssets}` : 

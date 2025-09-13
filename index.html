@@ -943,6 +943,161 @@
       }
     }
 
+    // 下载量存储与显示
+    function getDownloadCounts() {
+      // 本地存储结构: { "asset_url": count, ... }
+      try {
+        return JSON.parse(localStorage.getItem('downloadCounts') || '{}');
+      } catch {
+        return {};
+      }
+    }
+    function setDownloadCounts(counts) {
+      localStorage.setItem('downloadCounts', JSON.stringify(counts));
+    }
+    function incrementDownloadCount(assetUrl) {
+      const counts = getDownloadCounts();
+      counts[assetUrl] = (counts[assetUrl] || 0) + 1;
+      setDownloadCounts(counts);
+      // 更新页面显示
+      updateDownloadCountDisplay(assetUrl);
+    }
+    function updateDownloadCountDisplay(assetUrl) {
+      const els = document.querySelectorAll(`[data-asset-url="${assetUrl}"] .download-count`);
+      const counts = getDownloadCounts();
+      els.forEach(el => {
+        el.textContent = counts[assetUrl] || 0;
+      });
+    }
+    function updateAllDownloadCounts() {
+      const counts = getDownloadCounts();
+      document.querySelectorAll('.download-item').forEach(item => {
+        const assetUrl = item.getAttribute('data-asset-url');
+        if (assetUrl) {
+          const count = counts[assetUrl] || 0;
+          const countEl = item.querySelector('.download-count');
+          if (countEl) countEl.textContent = count;
+        }
+      });
+    }
+
+    // 获取某个release下所有文件的总下载量
+    function getReleaseTotalDownloads(release) {
+      const counts = getDownloadCounts();
+      return release.assets.reduce((sum, asset) => sum + (counts[asset.browser_download_url] || 0), 0);
+    }
+
+    // 修改renderReleases，增加每个release的总下载量显示
+    function renderReleases(releases) {
+      const container = document.getElementById('releases');
+      if (!releases.length) {
+        container.innerHTML = `<div class="loading-text"><i class="fas fa-info-circle"></i> ${langData[currentLang].noFiles}</div>`;
+        return;
+      }
+      container.innerHTML = releases.map(release => {
+        const totalDownloads = getReleaseTotalDownloads(release);
+        return `
+          <div class="release">
+            <div class="release-header">
+              <h3><i class="fas fa-tag"></i> ${escapeHtml(release.name)}</h3>
+              <div class="release-meta">
+                <span><i class="fas fa-code-branch"></i> ${langData[currentLang].version}：${escapeHtml(release.tag_name)}</span>
+                <span><i class="fas fa-calendar-alt"></i> ${langData[currentLang].published}：${new Date(release.published_at).toLocaleDateString()}</span>
+                <span style="margin-left:10px;">
+                  <i class="fas fa-download"></i>
+                  <span class="release-download-count" data-release-tag="${escapeHtml(release.tag_name)}">${totalDownloads}</span>
+                  ${currentLang === 'zh' ? '总下载' : 'total downloads'}
+                </span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px;">
+              <button class="submit-button toggle-desc" style="margin-top:0;">
+                <i class="fas fa-info-circle"></i> ${currentLang === 'zh' ? '显示简介' : 'Show Description'}
+              </button>
+              <button class="submit-button toggle-assets" style="margin-top:0;">
+                <i class="fas fa-layer-group"></i> ${langData[currentLang].showAssets}
+              </button>
+            </div>
+            <div class="release-description" style="margin:0 0 12px 0; color:var(--on-surface-variant); font-size:1rem; display:none;">
+              ${release.body ? release.body.replace(/\n/g, '<br>') : `<span style="color:#bbb;">${langData[currentLang].noContent}</span>`}
+            </div>
+            <ul class="assets" style="display:none;">
+              ${release.assets.map(asset => `
+                <li class="download-item" data-asset-url="${asset.browser_download_url}">
+                  <div class="file-info">
+                    <span class="file-name"><i class="fas fa-file"></i> ${escapeHtml(asset.name)}</span>
+                    <span class="file-size"><i class="fas fa-database"></i> ${formatFileSize(asset.size)}</span>
+                    <span style="margin-left:10px;color:#888;font-size:0.95em;">
+                      <i class="fas fa-download"></i> 
+                      <span class="download-count">0</span> ${currentLang === 'zh' ? '次下载' : 'downloads'}
+                    </span>
+                  </div>
+                  <div class="download-options">
+                    <a href="${asset.browser_download_url}" class="download-link" onclick="incrementDownloadCount('${asset.browser_download_url}')">
+                      <i class="fas fa-download"></i> ${langData[currentLang].normalDownload}
+                    </a>
+                    <a href="${generateProxyUrl(asset.browser_download_url)}" 
+                       class="download-link accelerated" onclick="incrementDownloadCount('${asset.browser_download_url}')">
+                      <i class="fas fa-bolt"></i> ${langData[currentLang].fastDownload}
+                    </a>
+                  </div>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }).join('');
+
+      // 简介收起/展开
+      document.querySelectorAll('.toggle-desc').forEach(button => {
+        button.addEventListener('click', function() {
+          const desc = this.parentElement.nextElementSibling;
+          const isShow = desc.style.display === 'block';
+          desc.style.display = isShow ? 'none' : 'block';
+          this.innerHTML = isShow
+            ? `<i class="fas fa-info-circle"></i> ${currentLang === 'zh' ? '显示简介' : 'Show Description'}`
+            : `<i class="fas fa-info-circle"></i> ${currentLang === 'zh' ? '收起简介' : 'Hide Description'}`;
+        });
+      });
+
+      // 资源收起/展开
+      document.querySelectorAll('.toggle-assets').forEach(button => {
+        button.addEventListener('click', function() {
+          const assetsList = this.parentElement.parentElement.querySelector('.assets');
+          assetsList.style.display = assetsList.style.display === 'none' ? 'block' : 'none';
+          this.innerHTML = assetsList.style.display === 'none' ? 
+            `<i class="fas fa-layer-group"></i> ${langData[currentLang].showAssets}` : 
+            `<i class="fas fa-layer-group"></i> ${langData[currentLang].hideAssets}`;
+        });
+      });
+
+      // 渲染后更新所有下载量
+      updateAllDownloadCounts();
+      updateAllReleaseDownloadCounts(releases);
+    }
+
+    // 更新所有release的总下载量（每次单文件下载量变化时调用）
+    function updateAllReleaseDownloadCounts(releases) {
+      if (!releases) releases = allReleasesCache;
+      releases.forEach(release => {
+        const total = getReleaseTotalDownloads(release);
+        // 通过tag_name定位（假设tag唯一）
+        const els = document.querySelectorAll(`.release-download-count[data-release-tag="${escapeHtml(release.tag_name)}"]`);
+        els.forEach(el => el.textContent = total);
+      });
+    }
+
+    // 修改incrementDownloadCount，下载量变化时同步更新release总下载量
+    function incrementDownloadCount(assetUrl) {
+      const counts = getDownloadCounts();
+      counts[assetUrl] = (counts[assetUrl] || 0) + 1;
+      setDownloadCounts(counts);
+      updateDownloadCountDisplay(assetUrl);
+      // 找到该asset属于哪个release，更新其总下载量
+      const release = allReleasesCache.find(r => r.assets.some(a => a.browser_download_url === assetUrl));
+      if (release) updateAllReleaseDownloadCounts([release]);
+    }
+
     // 语言切换功能
     const langData = {
       zh: {
@@ -1104,47 +1259,59 @@
         container.innerHTML = `<div class="loading-text"><i class="fas fa-info-circle"></i> ${langData[currentLang].noFiles}</div>`;
         return;
       }
-      container.innerHTML = releases.map(release => `
-        <div class="release">
-          <div class="release-header">
-            <h3><i class="fas fa-tag"></i> ${escapeHtml(release.name)}</h3>
-            <div class="release-meta">
-              <span><i class="fas fa-code-branch"></i> ${langData[currentLang].version}：${escapeHtml(release.tag_name)}</span>
-              <span><i class="fas fa-calendar-alt"></i> ${langData[currentLang].published}：${new Date(release.published_at).toLocaleDateString()}</span>
+      container.innerHTML = releases.map(release => {
+        const totalDownloads = getReleaseTotalDownloads(release);
+        return `
+          <div class="release">
+            <div class="release-header">
+              <h3><i class="fas fa-tag"></i> ${escapeHtml(release.name)}</h3>
+              <div class="release-meta">
+                <span><i class="fas fa-code-branch"></i> ${langData[currentLang].version}：${escapeHtml(release.tag_name)}</span>
+                <span><i class="fas fa-calendar-alt"></i> ${langData[currentLang].published}：${new Date(release.published_at).toLocaleDateString()}</span>
+                <span style="margin-left:10px;">
+                  <i class="fas fa-download"></i>
+                  <span class="release-download-count" data-release-tag="${escapeHtml(release.tag_name)}">${totalDownloads}</span>
+                  ${currentLang === 'zh' ? '总下载' : 'total downloads'}
+                </span>
+              </div>
             </div>
+            <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px;">
+              <button class="submit-button toggle-desc" style="margin-top:0;">
+                <i class="fas fa-info-circle"></i> ${currentLang === 'zh' ? '显示简介' : 'Show Description'}
+              </button>
+              <button class="submit-button toggle-assets" style="margin-top:0;">
+                <i class="fas fa-layer-group"></i> ${langData[currentLang].showAssets}
+              </button>
+            </div>
+            <div class="release-description" style="margin:0 0 12px 0; color:var(--on-surface-variant); font-size:1rem; display:none;">
+              ${release.body ? release.body.replace(/\n/g, '<br>') : `<span style="color:#bbb;">${langData[currentLang].noContent}</span>`}
+            </div>
+            <ul class="assets" style="display:none;">
+              ${release.assets.map(asset => `
+                <li class="download-item" data-asset-url="${asset.browser_download_url}">
+                  <div class="file-info">
+                    <span class="file-name"><i class="fas fa-file"></i> ${escapeHtml(asset.name)}</span>
+                    <span class="file-size"><i class="fas fa-database"></i> ${formatFileSize(asset.size)}</span>
+                    <span style="margin-left:10px;color:#888;font-size:0.95em;">
+                      <i class="fas fa-download"></i> 
+                      <span class="download-count">0</span> ${currentLang === 'zh' ? '次下载' : 'downloads'}
+                    </span>
+                  </div>
+                  <div class="download-options">
+                    <a href="${asset.browser_download_url}" class="download-link" onclick="incrementDownloadCount('${asset.browser_download_url}')">
+                      <i class="fas fa-download"></i> ${langData[currentLang].normalDownload}
+                    </a>
+                    <a href="${generateProxyUrl(asset.browser_download_url)}" 
+                       class="download-link accelerated" onclick="incrementDownloadCount('${asset.browser_download_url}')">
+                      <i class="fas fa-bolt"></i> ${langData[currentLang].fastDownload}
+                    </a>
+                  </div>
+                </li>
+              `).join('')}
+            </ul>
           </div>
-          <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px;">
-            <button class="submit-button toggle-desc" style="margin-top:0;">
-              <i class="fas fa-info-circle"></i> ${currentLang === 'zh' ? '显示简介' : 'Show Description'}
-            </button>
-            <button class="submit-button toggle-assets" style="margin-top:0;">
-              <i class="fas fa-layer-group"></i> ${langData[currentLang].showAssets}
-            </button>
-          </div>
-          <div class="release-description" style="margin:0 0 12px 0; color:var(--on-surface-variant); font-size:1rem; display:none;">
-            ${release.body ? release.body.replace(/\n/g, '<br>') : `<span style="color:#bbb;">${langData[currentLang].noContent}</span>`}
-          </div>
-          <ul class="assets" style="display:none;">
-            ${release.assets.map(asset => `
-              <li class="download-item">
-                <div class="file-info">
-                  <span class="file-name"><i class="fas fa-file"></i> ${escapeHtml(asset.name)}</span>
-                  <span class="file-size"><i class="fas fa-database"></i> ${formatFileSize(asset.size)}</span>
-                </div>
-                <div class="download-options">
-                  <a href="${asset.browser_download_url}" class="download-link">
-                    <i class="fas fa-download"></i> ${langData[currentLang].normalDownload}
-                  </a>
-                  <a href="${generateProxyUrl(asset.browser_download_url)}" 
-                     class="download-link accelerated">
-                    <i class="fas fa-bolt"></i> ${langData[currentLang].fastDownload}
-                  </a>
-                </div>
-              </li>
-            `).join('')}
-          </ul>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       // 简介收起/展开
       document.querySelectorAll('.toggle-desc').forEach(button => {
@@ -1168,6 +1335,10 @@
             `<i class="fas fa-layer-group"></i> ${langData[currentLang].hideAssets}`;
         });
       });
+
+      // 渲染后更新所有下载量
+      updateAllDownloadCounts();
+      updateAllReleaseDownloadCounts(releases);
     }
 
     // 文件搜索功能

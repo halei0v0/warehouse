@@ -794,14 +794,14 @@
     <div class="card">
       <h2 class="section-title"><i class="fas fa-box-open"></i> 文件发布</h2>
       <!-- 新增搜索框 -->
-      <div class="search-bar" style="margin-bottom: 24px; display: flex; gap: 12px; align-items: center;">
-        <input type="text" id="fileSearchInput" class="form-input" style="max-width: 350px; flex: 1;" placeholder="搜索文件名/版本..." oninput="filterReleases()">
-        <button class="submit-button" onclick="clearFileSearch()" type="button" style="flex-shrink: 0;"><i class="fas fa-times"></i> 清空</button>
-        <!-- 下载数据按钮 -->
-        <button class="submit-button" onclick="showDownloadStats()" type="button" style="flex-shrink: 0;">
-          <i class="fas fa-chart-bar"></i> 下载数据
-        </button>
-      </div>
+      <div class="search-bar" style="margin-bottom: 24px; display: flex; gap: 12px; align-items: stretch;">
+      <input type="text" id="fileSearchInput" class="form-input" style="max-width: 350px; flex: 1; height: 100%;" placeholder="搜索文件名/版本..." oninput="filterReleases()">
+      <button class="submit-button" onclick="clearFileSearch()" type="button" style="flex-shrink: 0; height: 100%; display: flex; align-items: center;"><i class="fas fa-times"></i> 清空</button>
+  <!-- 下载数据按钮 -->
+      <button class="submit-button" onclick="showDownloadStats()" type="button" style="flex-shrink: 0; height: 100%; display: flex; align-items: center;">
+    <i class="fas fa-chart-bar"></i> 下载数据
+  </button>
+</div>
       <div class="release-grid" id="releases">
         <div class="loading-text"><i class="fas fa-spinner"></i> 加载发布文件中...</div>
       </div>

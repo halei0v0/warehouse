@@ -1076,6 +1076,7 @@
           <tr style="background:#f5f5f5;">
             <th style="padding:8px;border:1px solid #ddd;">文件名</th>
             <th style="padding:8px;border:1px solid #ddd;">下载量</th>
+            <th style="padding:8px;border:1px solid #ddd;">操作</th>
           </tr>
         </thead>
         <tbody>`;
@@ -1086,6 +1087,11 @@
         html += `<tr>
           <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(name)}</td>
           <td style="padding:8px;border:1px solid #ddd;">${count}</td>
+          <td style="padding:8px;border:1px solid #ddd;">
+            <a href="${url}" target="_blank" style="background:var(--primary);color:#fff;padding:6px 16px;border-radius:6px;text-decoration:none;font-weight:600;transition:opacity 0.2s;">
+              <i class="fas fa-download"></i> 下载
+            </a>
+          </td>
         </tr>`;
       });
       html += `</tbody></table>`;
